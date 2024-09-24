@@ -10,7 +10,6 @@ WORKDIR /src
 
 # Usar as mudanças do package.json para forçar o Docker invalidar o cache
 # quando houver mudanças nas dependências
-COPY front/.env /src
 COPY front/package.json /src
 
 # Resolver as dependencias do projeto
