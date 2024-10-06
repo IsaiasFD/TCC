@@ -2,17 +2,22 @@ const BitrixService = require('./bitrix.service')
 const UserAccountService = require('./userAccount.service')
 const { formatSimpleUser, getNameAndIdFromUser, formatTask } = require('../utils/utils')
 
-const getAllTasksAndGroupsWithMembers = async (userId, fromDate, toDate) => {
+const getBitrixAccess = async (userId) => {
 	const [bitrixAccessInfo] = await UserAccountService.getUsersByIds(userId)
 	let bitrixAccess = {
 		fullDomain: bitrixAccessInfo.domain_bitrix,
 		accessToken: bitrixAccessInfo.access_token_bitrix,
 		refreshToken: bitrixAccessInfo.refresh_token_bitrix
 	}
-	let allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate)
+	return bitrixAccess
+}
+
+const getAllTasksAndGroupsWithMembers = async (userId, fromDate, toDate, groupsSelected) => {
+	let bitrixAccess = await getBitrixAccess(userId)
+	let allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate, groupsSelected)
 	if (allTasks.status === 401) {
 		bitrixAccess = allTasks.newAccess
-		allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate)
+		allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate, groupsSelected)
 	}
 
 	let groups = []
@@ -108,6 +113,13 @@ const getAllTasksAndGroupsWithMembers = async (userId, fromDate, toDate) => {
 	return { groups, members, tags, allTasks }
 }
 
+const getBitrixGroups = async (userId) => {
+	let bitrixAccess = await getBitrixAccess(userId)
+	const groups = await BitrixService.getBitrixGroups(bitrixAccess)
+	return groups.map((group) => ({ id: group.GROUP_ID, name: group.GROUP_NAME }))
+}
+
 module.exports = {
-	getAllTasksAndGroupsWithMembers
+	getAllTasksAndGroupsWithMembers,
+	getBitrixGroups
 }

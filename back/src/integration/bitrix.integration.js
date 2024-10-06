@@ -57,14 +57,36 @@ const getTaskHistory = async (bitrixAccess, taskId) => {
 	}
 }
 
-const getTasksWithFilters = async (bitrixAccess, start, fromDate, toDate) => {
+const getBitrixGroups = async (bitrixAccess) => {
+	const restUrl = `https://${bitrixAccess.fullDomain}/rest/sonet_group.user.groups.json?auth=${bitrixAccess.accessToken}`
+	try {
+		const response = await axios.get(restUrl)
+		return response.data
+	} catch (error) {
+		console.error('Error fetching groups:', error)
+		throw error
+	}
+}
+
+const getFilterGroupId = (groups) => {
+	return convertStringToList(groups)
+		.map((g) => `&filter[GROUP_ID][]=${g}`)
+		.join('')
+}
+
+const convertStringToList = (str) => {
+	return str.split(',').map(Number)
+}
+
+const getTasksWithFilters = async (bitrixAccess, start, fromDate, toDate, groupsSelected) => {
 	const restUrl = baseAppBitrixRestUrlTask(bitrixAccess.fullDomain, bitrixAccess.accessToken)
 	const res = await axios
 		.get(
 			restUrl +
 				`&start=${start}&filter[>CREATED_DATE]=${fromDate + '00:00:00'}&filter[<CREATED_DATE]=${
 					toDate + '23:59:59'
-				}&select[]=*&select[]=TAGS&select[]=UF_*`
+				}&select[]=*&select[]=TAGS&select[]=UF_*` +
+				getFilterGroupId(groupsSelected)
 		)
 		.catch(async (e) => {
 			if (e.response.status === 401) {
@@ -118,5 +140,6 @@ module.exports = {
 	getUrlAuth,
 	getFinalAccessUrl,
 	getTasksWithFilters,
-	getBitrixUsersByIds
+	getBitrixUsersByIds,
+	getBitrixGroups
 }

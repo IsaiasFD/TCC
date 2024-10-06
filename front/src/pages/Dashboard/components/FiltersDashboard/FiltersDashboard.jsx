@@ -4,8 +4,10 @@ import { Button, Card, Modal, Grid, Checkbox, Typography } from '@mui/material'
 //system libs
 import SelectTag from 'components/SelectTag/SelectTag'
 import { addOnFiltersAction } from 'storage/redux/actions/dashboard.actions'
-import { DEFAULT_DASHBOARD_FILTERS, savedFilters } from 'storage/redux/reducer/main.reducer'
+import { DEFAULT_DASHBOARD_FILTERS } from 'storage/redux/reducer/main.reducer'
 import MembersFiltersCheckList from './components/MembersFiltersCheckList/MembersFiltersCheckList'
+import { set } from 'date-fns'
+import api from 'service/service'
 
 const style = {
 	position: 'absolute',
@@ -106,18 +108,33 @@ const getFilterOptions = (data, filters) => {
 		tasks: tasksFiltered,
 		options: {
 			members: membersOptions,
-			groups: groupsOptions,
 			tags: tagsOptions
 		}
 	}
 	return filterData
 }
 
-const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, onApplyFilters, buttonStyle }) => {
+let firstLoad = true
+
+const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, onApplyFilters, buttonStyle, fromDate, toDate }) => {
 	const [filters, setFilters] = useState(filtersDependantRedux)
 	const [filterOptions, setFilterOptions] = useState(data)
-	const [filteredTasks, setFilteredTasks] = useState(data.allTasks)
-	const [open, setOpen] = useState(false)
+	const [open, setOpen] = useState(true)
+
+	const loadTasks = async () => {
+		try {
+			if (filters.groups.length === 0) {
+				return { ...filterOptions, allTasks: [], members: [], tags: [] }
+			}
+			const selectedGroups = filters.groups.map((g) => g.id)
+			const encodedGroups = encodeURIComponent(selectedGroups.join(','))
+			const res = await api.get(`/dashboard/get-all-tasks-and-groups-with-members/${fromDate}/${toDate}/${encodedGroups}`)
+			const fOptions = { ...filterOptions, allTasks: res?.data?.allTasks, members: res?.data?.members, tags: res?.data?.tags }
+			return fOptions
+		} catch (error) {
+			console.error('Error loading data:', error)
+		}
+	}
 
 	useEffect(() => {
 		if (!open) {
@@ -127,21 +144,27 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 	}, [open])
 
 	useEffect(() => {
-		//applyFilters(DEFAULT_DASHBOARD_FILTERS)
-		if (data) {
-			setFilterOptions({ groups: data.groups, members: data.members, tags: data.tags, priority: priorityOptions })
-		}
-	}, [data])
+		setFilters(filtersDependantRedux)
+		applyFilters(filtersDependantRedux, firstLoad)
+		firstLoad = false
+	}, [filtersDependantRedux])
 
 	useEffect(() => {
-		setFilters(filtersDependantRedux)
-		applyFilters(filtersDependantRedux)
-	}, [filtersDependantRedux])
+		loadTasks().then((res) => {
+			handleChangeFilter(res, filters)
+		})
+	}, [filters.groups])
+
+	useEffect(() => {
+		loadTasks().then((res) => {
+			const tasks = handleChangeFilter(res, filters)
+			onApplyFilters(tasks)
+		})
+	}, [fromDate, toDate])
 
 	const onChangeGroups = (changedGroups) => {
 		const newFilters = { ...filters, groups: changedGroups }
 		setFilters(newFilters)
-		handleChangeSelect(newFilters, 'groups')
 	}
 
 	const onChangeMembers = (changedMembers) => {
@@ -165,20 +188,22 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 	}
 
 	const handleOpen = () => setOpen(true)
-	const handleClose = () => setOpen(false)
-
-	const applyFilters = (filters) => {
-		addOnFiltersDispatch({ dependant: filters })
+	const handleClose = () => {
 		setOpen(false)
+	}
+
+	const applyFilters = (filters, closeFilter) => {
+		setOpen(!!closeFilter)
+		addOnFiltersDispatch({ dependant: filters })
 		if (onApplyFilters) {
-			const tasks = handleChangeFilter(data, filters)
+			const tasks = handleChangeFilter(filterOptions, filters)
 			onApplyFilters(tasks)
 		}
 	}
 
 	const resetFilters = () => {
 		setFilters(DEFAULT_DASHBOARD_FILTERS)
-		handleChangeFilter(data, DEFAULT_DASHBOARD_FILTERS)
+		const tasks = handleChangeFilter(data, DEFAULT_DASHBOARD_FILTERS)
 	}
 
 	const handleChangeShowOnlyData = (event, type) => {
@@ -195,13 +220,12 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 	}
 
 	const handleChangeSelect = (newFilters) => {
-		handleChangeFilter(data, newFilters)
+		handleChangeFilter(filterOptions, newFilters)
 	}
 
 	const handleChangeFilter = (filterData, newFilters) => {
 		const { options, tasks } = getFilterOptions(filterData, newFilters)
-		setFilteredTasks(tasks)
-		setFilterOptions(options)
+		setFilterOptions({ ...filterData, members: options.members, tags: options.tags })
 		return tasks
 	}
 
@@ -250,7 +274,9 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 }
 
 const mapStateToProps = ({ store }) => ({
-	filtersDependantRedux: store?.dashboard?.filters?.dependant
+	filtersDependantRedux: store?.dashboard?.filters?.dependant,
+	fromDate: store?.dashboard?.filters?.fromDate,
+	toDate: store?.dashboard?.filters?.toDate
 })
 
 const mapDispatchToProps = (dispatch) => ({
