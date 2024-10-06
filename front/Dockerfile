@@ -10,7 +10,7 @@ WORKDIR /src
 
 # Usar as mudanças do package.json para forçar o Docker invalidar o cache
 # quando houver mudanças nas dependências
-COPY package.json /src
+COPY front/package.json /src
 
 # Resolver as dependencias do projeto
 RUN set -eux; \
@@ -19,7 +19,7 @@ RUN set -eux; \
       npm install;
 
 #  Copiar o fonte do projeto para a imagem de build
-COPY ./ /src
+COPY front/ /src
 
 # Buildar o front end
 RUN npm run build;
@@ -30,8 +30,8 @@ FROM nginx:alpine
 # Copie os arquivos construídos da etapa de construção para o diretório do Nginx
 COPY --from=builder /src/build /usr/share/nginx/html
 
-# Exponha a porta em que o Nginx estará ouvindo
-EXPOSE 80
+# # Exponha a porta em que o Nginx estará ouvindo
+# EXPOSE 80
 
-# Comando para iniciar o Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# # Comando para iniciar o Nginx
+# CMD ["nginx", "-g", "daemon off;"]

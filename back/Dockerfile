@@ -10,7 +10,7 @@ WORKDIR /src
 
 # Usar as mudanças do package.json para forçar o Docker invalidar o cache
 # quando houver mudanças nas dependências
-COPY package.json /src
+COPY back/package.json /src
 
 # Resolver as dependencias do projeto
 RUN set -eux; \
@@ -19,7 +19,7 @@ RUN set -eux; \
       npm install;
 
 #  Copiar o fonte do projeto para a imagem de build
-COPY ./ /src
+COPY back/ /src
 
 EXPOSE 4000
 
