@@ -6,8 +6,9 @@ import SelectTag from 'components/SelectTag/SelectTag'
 import { addOnFiltersAction } from 'storage/redux/actions/dashboard.actions'
 import { DEFAULT_DASHBOARD_FILTERS } from 'storage/redux/reducer/main.reducer'
 import MembersFiltersCheckList from './components/MembersFiltersCheckList/MembersFiltersCheckList'
-import { set } from 'date-fns'
 import api from 'service/service'
+import { add, set } from 'date-fns'
+import { is } from 'date-fns/locale'
 
 const style = {
 	position: 'absolute',
@@ -32,7 +33,6 @@ const getFilterOptions = (data, filters) => {
 	//Verifica a partir das tags selecionados quais membros serão mostrados no select
 	let tasksFiltered = data.allTasks
 	let membersOptions = data.members
-	let groupsOptions = data.groups
 	let tagsOptions = data.tags
 	// Adiciona a verificação para filtrar tagsOptions com base nos grupos selecionados
 	if (filters.groups.length > 0) {
@@ -115,18 +115,20 @@ const getFilterOptions = (data, filters) => {
 }
 
 let firstLoad = true
+let loadedOptions = false
+let firstApply = true
 
 const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, onApplyFilters, buttonStyle, fromDate, toDate }) => {
-	const [filters, setFilters] = useState(filtersDependantRedux)
+	const [selectedFilters, setSelectedFilters] = useState(DEFAULT_DASHBOARD_FILTERS)
 	const [filterOptions, setFilterOptions] = useState(data)
 	const [open, setOpen] = useState(true)
 
 	const loadTasks = async () => {
 		try {
-			if (filters.groups.length === 0) {
+			if (selectedFilters.groups.length === 0) {
 				return { ...filterOptions, allTasks: [], members: [], tags: [] }
 			}
-			const selectedGroups = filters.groups.map((g) => g.id)
+			const selectedGroups = selectedFilters.groups
 			const encodedGroups = encodeURIComponent(selectedGroups.join(','))
 			const res = await api.get(`/dashboard/get-all-tasks-and-groups-with-members/${fromDate}/${toDate}/${encodedGroups}`)
 			const fOptions = { ...filterOptions, allTasks: res?.data?.allTasks, members: res?.data?.members, tags: res?.data?.tags }
@@ -136,55 +138,94 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 		}
 	}
 
+	// useEffect(() => {
+	// 	if (!open && !firstLoad) {
+	// 		handleChangeFilter(data, filtersDependantRedux)
+	// 	}
+	// }, [open])
+
 	useEffect(() => {
-		if (!open) {
-			setFilters(filtersDependantRedux)
-			handleChangeFilter(data, filtersDependantRedux)
+		// const tempFilter = {
+		// 	...filtersDependantRedux,
+		// 	groups: filterOptions.groups.filter((g) => filtersDependantRedux.groups.includes(g.id)).map((g) => g.id),
+		// 	members: filterOptions.members.filter((m) => filtersDependantRedux.members.includes(m.id)).map((m) => m.id),
+		// 	tags: filterOptions.tags.filter((t) => filtersDependantRedux.tags.includes(t.id)).map((t) => t.id),
+		// 	priority: priorityOptions.filter((p) => filtersDependantRedux.priority.includes(p.id)).map((p) => p.id),
+		// 	showOnlySelectedMemberData: filtersDependantRedux.showOnlySelectedMemberData,
+		// 	showOnlyHotfixData: filtersDependantRedux.showOnlyHotfixData,
+		// 	showOnlyHighPriorityData: filtersDependantRedux.showOnlyHighPriorityData
+		// }
+		setSelectedFilters(filtersDependantRedux)
+		//applyFilters(tempFilter, firstLoad)
+		if (filtersDependantRedux.groups.length > 0) {
+			setOpen(false)
 		}
-	}, [open])
+	}, [])
 
 	useEffect(() => {
-		setFilters(filtersDependantRedux)
-		applyFilters(filtersDependantRedux, firstLoad)
-		firstLoad = false
-	}, [filtersDependantRedux])
+		if (!firstLoad) {
+			loadTasks().then((res) => {
+				handleChangeFilter(res, selectedFilters)
+			})
+		} else {
+			firstLoad = false
+		}
+	}, [selectedFilters])
 
 	useEffect(() => {
-		loadTasks().then((res) => {
-			handleChangeFilter(res, filters)
-		})
-	}, [filters.groups])
+		if (loadedOptions) {
+			const tempFilter = {
+				...selectedFilters,
+				groups: filterOptions.groups.filter((g) => selectedFilters.groups.includes(g.id)).map((g) => g.id),
+				members: filterOptions.members.filter((m) => selectedFilters.members.includes(m.id)).map((m) => m.id),
+				tags: filterOptions.tags.filter((t) => selectedFilters.tags.includes(t.id)).map((t) => t.id),
+				priority: priorityOptions.filter((p) => selectedFilters.priority.includes(p.id)).map((p) => p.id),
+				showOnlySelectedMemberData: selectedFilters.showOnlySelectedMemberData,
+				showOnlyHotfixData: selectedFilters.showOnlyHotfixData,
+				showOnlyHighPriorityData: selectedFilters.showOnlyHighPriorityData
+			}
+			setSelectedFilters(tempFilter)
+
+			if (firstApply) {
+				applyFilters(tempFilter, firstLoad)
+				firstApply = false
+			}
+		} else {
+			loadedOptions = true
+		}
+	}, [filterOptions.members, filterOptions.tags])
 
 	useEffect(() => {
-		loadTasks().then((res) => {
-			const tasks = handleChangeFilter(res, filters)
-			onApplyFilters(tasks)
-		})
+		if (!firstLoad) {
+			loadTasks().then((res) => {
+				const tasks = handleChangeFilter(res, selectedFilters)
+				onApplyFilters(tasks)
+			})
+		}
 	}, [fromDate, toDate])
 
 	const onChangeGroups = (changedGroups) => {
-		const newFilters = { ...filters, groups: changedGroups }
-		setFilters(newFilters)
+		const newFilters = { ...selectedFilters, groups: changedGroups.map((g) => g.id) }
+		setSelectedFilters(newFilters)
+		handleChangeSelect(newFilters, 'groups')
 	}
 
 	const onChangeMembers = (changedMembers) => {
-		const newFilters = { ...filters, members: changedMembers }
+		const newFilters = { ...selectedFilters, members: changedMembers.map((m) => m.id) }
 		if (changedMembers.length === 0) {
-			newFilters.showOnlySelectedMemberData = false
+			setSelectedFilters({ ...newFilters, showOnlySelectedMemberData: false })
+		} else {
+			setSelectedFilters(newFilters)
 		}
-		setFilters(newFilters)
-		handleChangeSelect(newFilters, 'members')
 	}
 	const onChangeTags = (changedTags) => {
-		const newFilters = { ...filters, tags: changedTags }
-		setFilters(newFilters)
-		handleChangeSelect(newFilters, 'tags')
+		const newFilters = { ...selectedFilters, tags: changedTags.map((t) => t.id) }
+		setSelectedFilters(newFilters)
 	}
 
 	const onChangePriority = (changedPriority) => {
-		const newFilters = { ...filters, priority: changedPriority }
-		setFilters(newFilters)
-		handleChangeSelect(newFilters, 'priority')
+		const newFilters = { ...selectedFilters, priority: changedPriority.map((p) => p.id) }
+		setSelectedFilters(newFilters)
 	}
 
 	const handleOpen = () => setOpen(true)
@@ -192,22 +233,24 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 		setOpen(false)
 	}
 
-	const applyFilters = (filters, closeFilter) => {
+	const applyFilters = (selectedFilter, closeFilter) => {
 		setOpen(!!closeFilter)
-		addOnFiltersDispatch({ dependant: filters })
+
 		if (onApplyFilters) {
-			const tasks = handleChangeFilter(filterOptions, filters)
+			const tasks = handleChangeFilter(filterOptions, selectedFilter)
+			addOnFiltersDispatch({ dependant: selectedFilter })
 			onApplyFilters(tasks)
 		}
 	}
 
 	const resetFilters = () => {
-		setFilters(DEFAULT_DASHBOARD_FILTERS)
-		const tasks = handleChangeFilter(data, DEFAULT_DASHBOARD_FILTERS)
+		setSelectedFilters(DEFAULT_DASHBOARD_FILTERS)
+		addOnFiltersDispatch({ dependant: DEFAULT_DASHBOARD_FILTERS })
+		handleChangeFilter(data, DEFAULT_DASHBOARD_FILTERS)
 	}
 
 	const handleChangeShowOnlyData = (event, type) => {
-		let newFilters = { ...filters }
+		let newFilters = { ...selectedFilters }
 		if (type === 'members') {
 			newFilters.showOnlySelectedMemberData = event.target.checked
 		} else if (type === 'hotfix') {
@@ -215,7 +258,7 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 		} else if (type === 'highPriority') {
 			newFilters.showOnlyHighPriorityData = event.target.checked
 		}
-		setFilters(newFilters)
+		setSelectedFilters(newFilters)
 		handleChangeFilter(data, newFilters)
 	}
 
@@ -224,8 +267,23 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 	}
 
 	const handleChangeFilter = (filterData, newFilters) => {
-		const { options, tasks } = getFilterOptions(filterData, newFilters)
-		setFilterOptions({ ...filterData, members: options.members, tags: options.tags })
+		const filterOptionsSelected = {
+			groups: filterOptions.groups.filter((g) => newFilters.groups.includes(g.id)),
+			members: filterOptions.members.filter((m) => newFilters.members.includes(m.id)),
+			tags: filterOptions.tags.filter((t) => newFilters.tags.includes(t.id)),
+			priority: priorityOptions.filter((p) => newFilters.priority.includes(p.id)),
+			showOnlySelectedMemberData: newFilters.showOnlySelectedMemberData,
+			showOnlyHotfixData: newFilters.showOnlyHotfixData,
+			showOnlyHighPriorityData: newFilters.showOnlyHighPriorityData
+		}
+		const { options, tasks } = getFilterOptions(filterData, filterOptionsSelected)
+		const changeMembers =
+			JSON.stringify(options.members.sort((a, b) => a.id - b.id)) !== JSON.stringify(filterOptions.members.sort((a, b) => a.id - b.id))
+		const changeTags = JSON.stringify(options.tags.sort((a, b) => a.id - b.id)) != JSON.stringify(filterOptions.tags.sort((a, b) => a.id - b.id))
+
+		if (changeMembers || changeTags) {
+			setFilterOptions({ ...filterData, members: options.members, tags: options.tags })
+		}
 		return tasks
 	}
 
@@ -238,32 +296,55 @@ const FiltersDashboard = ({ filtersDependantRedux, addOnFiltersDispatch, data, o
 				<Card sx={style} style={{ overflow: 'auto' }}>
 					<Grid container spacing={0}>
 						<Grid item xs={6}>
-							<SelectTag label='Grupos' options={filterOptions.groups} onChange={onChangeGroups} selected={filters.groups} />
-							<SelectTag label='Membros' options={filterOptions.members} onChange={onChangeMembers} selected={filters.members} />
-							<SelectTag label='Tags' options={filterOptions.tags} onChange={onChangeTags} selected={filters.tags} />
-							<SelectTag label='Prioridades' options={priorityOptions} onChange={onChangePriority} selected={filters.priority} />
+							<SelectTag
+								label='Grupos'
+								options={filterOptions.groups}
+								onChange={onChangeGroups}
+								selected={filterOptions?.groups?.filter((g) => selectedFilters.groups.includes(g.id)) || []}
+							/>
+							<SelectTag
+								label='Membros'
+								options={filterOptions.members}
+								onChange={onChangeMembers}
+								selected={filterOptions?.members?.filter((m) => selectedFilters.members.includes(m.id)) || []}
+							/>
+							<SelectTag
+								label='Tags'
+								options={filterOptions.tags}
+								onChange={onChangeTags}
+								selected={filterOptions?.tags?.filter((t) => selectedFilters.tags.includes(t.id)) || []}
+							/>
+							<SelectTag
+								label='Prioridades'
+								options={priorityOptions}
+								onChange={onChangePriority}
+								selected={filterOptions?.priority?.filter((p) => selectedFilters.priority.includes(p.id)) || []}
+							/>
 						</Grid>
 						<Grid item xs={6} style={{ paddingLeft: '5em', maxHeight: '15em', overflow: 'auto' }}>
-							<MembersFiltersCheckList data={filters.members} />
+							<MembersFiltersCheckList data={filterOptions?.members?.filter((m) => selectedFilters.members.includes(m.id)) || []} />
 						</Grid>
 						<Grid item xs={12} style={{ display: 'flex', alignItems: 'center' }}>
 							<Checkbox
 								onChange={(e) => handleChangeShowOnlyData(e, 'members')}
-								checked={filters.showOnlySelectedMemberData}
-								disabled={filters.members.length === 0}
+								checked={selectedFilters.showOnlySelectedMemberData}
+								disabled={selectedFilters.members.length === 0}
 							/>
 							<Typography>Mostrar apenas dados de membros selecionados</Typography>
 						</Grid>
 						<Grid item xs={12} style={{ display: 'flex', alignItems: 'center' }}>
-							<Checkbox onChange={(e) => handleChangeShowOnlyData(e, 'hotfix')} checked={filters.showOnlyHotfixData} />
+							<Checkbox onChange={(e) => handleChangeShowOnlyData(e, 'hotfix')} checked={selectedFilters.showOnlyHotfixData} />
 							<Typography>Mostrar apenas dados de hotfix</Typography>
 						</Grid>
 						<Grid item xs={12} style={{ display: 'flex', alignItems: 'center' }}>
-							<Checkbox onChange={(e) => handleChangeShowOnlyData(e, 'highPriority')} checked={filters.showOnlyHighPriorityData} />
+							<Checkbox
+								onChange={(e) => handleChangeShowOnlyData(e, 'highPriority')}
+								checked={selectedFilters.showOnlyHighPriorityData}
+							/>
 							<Typography>Mostrar apenas dados de alta prioridade</Typography>
 						</Grid>
 						<Grid item xs={12} style={{ display: 'flex', alignItems: 'center', marginTop: '2em', paddingLeft: '0.3em' }}>
-							<Button onClick={() => applyFilters(filters)}>Aplicar</Button>
+							<Button onClick={() => applyFilters(selectedFilters)}>Aplicar</Button>
 							<Button onClick={resetFilters}>Resetar</Button>
 						</Grid>
 					</Grid>

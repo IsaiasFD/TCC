@@ -1,12 +1,12 @@
 const BitrixIntegration = require('../integration/bitrix.integration')
 
-const getAllTasksWithFilters = async (bitrixAccess, fromDate, toDate, groupsSelected) => {
+const getAllTasksWithFilters = async (bitrixAccess, fromDate, toDate, groupsSelected, userId) => {
 	let totalTickets = []
 	const limit = 50
 	let start = 0
 	let iterations = null
 	do {
-		let data = await BitrixIntegration.getTasksWithFilters(bitrixAccess, start, fromDate, toDate, groupsSelected)
+		let data = await BitrixIntegration.getTasksWithFilters(bitrixAccess, start, fromDate, toDate, groupsSelected, userId)
 		if (data.status === 401 && data.newAccess) {
 			return data
 		} else {
@@ -54,10 +54,15 @@ const getBitrixGroups = async (bitrixAccess) => {
 	return res.result
 }
 
+const getTaskHistory = async (bitrixAccess, taskId) => {
+	return await BitrixIntegration.getTaskHistory(bitrixAccess, taskId)
+}
+
 module.exports = {
 	getAllTasksWithFilters,
 	getBitrixUsersByIds,
 	getFinalAccessUrl,
 	getUrlAuth,
-	getBitrixGroups
+	getBitrixGroups,
+	getTaskHistory
 }

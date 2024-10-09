@@ -21,6 +21,9 @@ const formatToSeriesPie = (formattedData) => {
 }
 
 function formatToSeries2(formattedData) {
+	formattedData.sort((a, b) => {
+		return new Date(a.key.createdDate) - new Date(b.key.createdDate)
+	})
 	let labels = new Set()
 	const seriesDataObject = []
 	formattedData.forEach((item) => {
@@ -152,57 +155,56 @@ const buildGraphsMetrics = (allTasks) => {
 				closedDate: task.closedDate
 			})
 		}
+		if (task.createdDate && task.closedDate && task.history && task.history.result && task.history.result.list) {
+			const created = moment(task.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
+			const closed = moment(task.closedDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
+			let responsibleTimes = {}
+			let currentResponsible = null
+			let currentStartTime = created
 
-		// if (task.createdDate && task.closedDate && task.history && task.history.result && task.history.result.list) {
-		// 	const created = moment(task.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
-		// 	const closed = moment(task.closedDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
-		// 	let responsibleTimes = {}
-		// 	let currentResponsible = null
-		// 	let currentStartTime = created
+			const sortedHistory = task.history.result.list.sort((a, b) =>
+				moment(a.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss']).diff(
+					moment(b.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
+				)
+			)
 
-		// 	const sortedHistory = task.history.result.list.sort((a, b) =>
-		// 		moment(a.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss']).diff(
-		// 			moment(b.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
-		// 		)
-		// 	)
+			sortedHistory.forEach((event) => {
+				if (event.field === 'RESPONSIBLE_ID') {
+					const eventTime = moment(event.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
+					if (currentResponsible) {
+						const duration = eventTime.diff(currentStartTime, 'hours', true)
+						if (!responsibleTimes[currentResponsible.id]) {
+							responsibleTimes[currentResponsible.id] = { hours: 0, name: `${currentResponsible.name} ${currentResponsible.lastName}` }
+						}
+						responsibleTimes[currentResponsible.id].hours += duration
+					}
+					currentResponsible = event.user
+					currentStartTime = eventTime
+				}
+			})
 
-		// 	sortedHistory.forEach((event) => {
-		// 		if (event.field === 'RESPONSIBLE_ID') {
-		// 			const eventTime = moment(event.createdDate, ['YYYY-MM-DDTHH:mm:ssZ', 'DD/MM/YYYY HH:mm:ss'])
-		// 			if (currentResponsible) {
-		// 				const duration = eventTime.diff(currentStartTime, 'hours', true)
-		// 				if (!responsibleTimes[currentResponsible.id]) {
-		// 					responsibleTimes[currentResponsible.id] = { hours: 0, name: `${currentResponsible.name} ${currentResponsible.lastName}` }
-		// 				}
-		// 				responsibleTimes[currentResponsible.id].hours += duration
-		// 			}
-		// 			currentResponsible = event.user
-		// 			currentStartTime = eventTime
-		// 		}
-		// 	})
+			if (currentResponsible) {
+				let closedFormated = moment.parseZone(closed).format('YYYY-MM-DDTHH:mm:ss')
+				let currentStartTimeFormated = moment.parseZone(currentStartTime).format('YYYY-MM-DDTHH:mm:ss')
+				const duration = moment(closedFormated).diff(moment(currentStartTimeFormated), 'hours')
 
-		// 	if (currentResponsible) {
-		// 		let closedFormated = moment.parseZone(closed).format('YYYY-MM-DDTHH:mm:ss')
-		// 		let currentStartTimeFormated = moment.parseZone(currentStartTime).format('YYYY-MM-DDTHH:mm:ss')
-		// 		const duration = moment(closedFormated).diff(moment(currentStartTimeFormated), 'hours')
+				if (!responsibleTimes[currentResponsible.id]) {
+					responsibleTimes[currentResponsible.id] = { hours: 0, name: `${currentResponsible.name} ${currentResponsible.lastName}` }
+				}
+				responsibleTimes[currentResponsible.id].hours += duration
+			}
 
-		// 		if (!responsibleTimes[currentResponsible.id]) {
-		// 			responsibleTimes[currentResponsible.id] = { hours: 0, name: `${currentResponsible.name} ${currentResponsible.lastName}` }
-		// 		}
-		// 		responsibleTimes[currentResponsible.id].hours += duration
-		// 	}
-
-		// 	for (const [responsibleId, data] of Object.entries(responsibleTimes)) {
-		// 		averageCompletionTimeHistory.push({
-		// 			responsibleId: responsibleId,
-		// 			responsibleName: data.name,
-		// 			tags: task.tags,
-		// 			completionTimeHours: data.hours,
-		// 			createdDate: task.createdDate,
-		// 			closedDate: task.closedDate
-		// 		})
-		// 	}
-		// }
+			for (const [responsibleId, data] of Object.entries(responsibleTimes)) {
+				averageCompletionTimeHistory.push({
+					responsibleId: responsibleId,
+					responsibleName: data.name,
+					tags: task.tags,
+					completionTimeHours: data.hours,
+					createdDate: task.createdDate,
+					closedDate: task.closedDate
+				})
+			}
+		}
 
 		// Prioridade
 		for (let i = 1; i <= 5; i++) {
@@ -300,7 +302,6 @@ const buildGraphsMetrics = (allTasks) => {
 
 	const groupedMembersAvg = lodash.groupBy(averageCompletionTime, 'responsibleId')
 	const avgMemberTimeByMonth = []
-
 	Object.values(groupedMembersAvg).forEach((members) => {
 		members.forEach((g) => {
 			const currentDate = new Date(g.closedDate)
@@ -326,6 +327,39 @@ const buildGraphsMetrics = (allTasks) => {
 				})
 			} else {
 				const existingEntry = avgMemberTimeByMonth[foundIndex]
+				const totalHours = existingEntry.value * existingEntry.count + g.completionTimeHours
+				existingEntry.count += 1
+				existingEntry.value = Math.round((totalHours / existingEntry.count) * 10) / 10
+			}
+		})
+	})
+	const groupedMembersAvgHistory = lodash.groupBy(averageCompletionTimeHistory, 'responsibleId')
+	const avgMemberTimeByMonthHistory = []
+	Object.values(groupedMembersAvgHistory).forEach((members) => {
+		members.forEach((g) => {
+			const currentDate = new Date(g.closedDate)
+			const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+			const foundIndex = avgMemberTimeByMonthHistory.findIndex((t) => {
+				const existingDate = new Date(t.key.createdDate)
+				return (
+					t.key.id === g.responsibleId &&
+					currentDate.getMonth() === existingDate.getMonth() &&
+					currentDate.getFullYear() === existingDate.getFullYear()
+				)
+			})
+
+			if (foundIndex === -1) {
+				avgMemberTimeByMonthHistory.push({
+					key: {
+						id: g.responsibleId,
+						name: g.responsibleName,
+						createdDate: monthStart
+					},
+					value: Math.round(g.completionTimeHours * 10) / 10,
+					count: 1
+				})
+			} else {
+				const existingEntry = avgMemberTimeByMonthHistory[foundIndex]
 				const totalHours = existingEntry.value * existingEntry.count + g.completionTimeHours
 				existingEntry.count += 1
 				existingEntry.value = Math.round((totalHours / existingEntry.count) * 10) / 10
@@ -390,7 +424,8 @@ const buildGraphsMetrics = (allTasks) => {
 		},
 		completionGraphData: {
 			averagePersonTime: formatToSeries2(avgMemberTimeByMonth),
-			averageTagTime: formatToSeries2(avgTagTimeByMonth)
+			averageTagTime: formatToSeries2(avgTagTimeByMonth),
+			averagePersonTimeHistory: formatToSeries2(avgMemberTimeByMonthHistory)
 		},
 		priorityGraphData: {
 			priorityTasks: formatToSeries2(priorityTasks)

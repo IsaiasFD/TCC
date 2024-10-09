@@ -10,6 +10,7 @@ import OverviewModule from './modules/OverviewModule/OverviewModule'
 import GraphsModule from './modules/GraphsModule/GraphsModule'
 import CalendarDatePicker from 'components/CalendarDatePicker/CalendarDatePicker'
 import { LoadingIcon } from 'utils/SystemIcons/SystemIcons'
+import { add } from 'date-fns'
 
 const ORIGINAL_FILTER_DATA = {
 	allTasks: [],
@@ -37,8 +38,8 @@ const Dashboard = ({ addOnFiltersDispatch, selectedMenuItemRedux, fromDate, toDa
 
 	const load = async () => {
 		setIsLoading(true)
-		const groups = await getGroups()
-		setOriginalFilterData({ ...ORIGINAL_FILTER_DATA, groups: groups })
+		const groupsData = await getGroups()
+		setOriginalFilterData({ ...ORIGINAL_FILTER_DATA, groups: groupsData })
 		setIsLoading(false)
 	}
 

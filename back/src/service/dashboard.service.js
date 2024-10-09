@@ -14,10 +14,10 @@ const getBitrixAccess = async (userId) => {
 
 const getAllTasksAndGroupsWithMembers = async (userId, fromDate, toDate, groupsSelected) => {
 	let bitrixAccess = await getBitrixAccess(userId)
-	let allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate, groupsSelected)
+	let allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate, groupsSelected, userId)
 	if (allTasks.status === 401) {
 		bitrixAccess = allTasks.newAccess
-		allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate, groupsSelected)
+		allTasks = await BitrixService.getAllTasksWithFilters(bitrixAccess, fromDate, toDate, groupsSelected, userId)
 	}
 
 	let groups = []

@@ -3,6 +3,10 @@ const express = require('express')
 const cors = require('cors')
 const jwt = require('jsonwebtoken')
 const config = require('./config')
+const rabbitmqService = require('./service/rabbitmq.service')
+const bitrixService = require('./service/bitrix.service')
+const taskHistoryService = require('./service/taskHistory.service')
+const UserAccountService = require('./service/userAccount.service')
 
 const app = express()
 const LoginResource = require('./resource/login.resource')
@@ -35,6 +39,33 @@ const interceptor = (req, res, next) => {
 	next()
 }
 app.use(interceptor)
+
+const getBitrixAccess = async (userId) => {
+	const [bitrixAccessInfo] = await UserAccountService.getUsersByIds(userId)
+	let bitrixAccess = {
+		fullDomain: bitrixAccessInfo.domain_bitrix,
+		accessToken: bitrixAccessInfo.access_token_bitrix,
+		refreshToken: bitrixAccessInfo.refresh_token_bitrix
+	}
+	return bitrixAccess
+}
+
+const processMessage = async (message) => {
+	const body = JSON.parse(message)
+	const taskId = body.taskId
+	const userId = body.userId
+	console.debug(`Processing task with ID: ${taskId}`)
+
+	const bitrixAccess = await getBitrixAccess(userId)
+	const taskHistory = await bitrixService.getTaskHistory(bitrixAccess, taskId)
+	try {
+		await taskHistoryService.createTaskHistory(taskId, taskHistory)
+	} catch (e) {
+		console.error(e)
+	}
+}
+
+rabbitmqService.consumeQueue('task_queue', processMessage)
 
 //Login
 app.get(PREFIX + '/login/get-url-auth/:domainBitrix', LoginResource.getUrlAuth)

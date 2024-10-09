@@ -114,6 +114,16 @@ const GraphsModule = ({ data, loading }) => {
 		},
 		{
 			id: 7,
+			canLoad: metrics?.completionGraphData?.averagePersonTimeHistory?.series?.length > 0,
+			series: metrics?.completionGraphData?.averagePersonTimeHistory?.series,
+			labels: metrics?.completionGraphData?.averagePersonTimeHistory?.labels,
+			title: 'Média de tempo de alocação em tarefas por pessoa',
+			additionalOptions: { formatterLabel: ' h' },
+			xs: 12,
+			typeChart: 'line'
+		},
+		{
+			id: 8,
 			canLoad: metrics?.usersGraphData?.responsibles?.series?.length > 0,
 			series: metrics?.usersGraphData?.responsibles?.series,
 			labels: metrics?.usersGraphData?.responsibles?.labels,
@@ -123,7 +133,7 @@ const GraphsModule = ({ data, loading }) => {
 			typeChart: 'bar'
 		},
 		{
-			id: 8,
+			id: 9,
 			canLoad: metrics?.usersGraphData?.creators?.series?.length > 0,
 			series: metrics?.usersGraphData?.creators?.series,
 			labels: metrics?.usersGraphData?.creators?.labels,
@@ -133,7 +143,7 @@ const GraphsModule = ({ data, loading }) => {
 			typeChart: 'bar'
 		},
 		{
-			id: 9,
+			id: 10,
 			canLoad: metrics?.usersGraphData?.closers?.series?.length > 0,
 			series: metrics?.usersGraphData?.closers?.series,
 			labels: metrics?.usersGraphData?.closers?.labels,
@@ -143,7 +153,7 @@ const GraphsModule = ({ data, loading }) => {
 			typeChart: 'bar'
 		},
 		{
-			id: 10,
+			id: 11,
 			canLoad: metrics?.usersGraphData?.accomplices?.series?.length > 0,
 			series: metrics?.usersGraphData?.accomplices?.series,
 			labels: metrics?.usersGraphData?.accomplices?.labels,
@@ -153,7 +163,7 @@ const GraphsModule = ({ data, loading }) => {
 			typeChart: 'bar'
 		},
 		{
-			id: 11,
+			id: 12,
 			canLoad: metrics?.usersGraphData?.auditors?.series?.length > 0,
 			series: metrics?.usersGraphData?.auditors?.series,
 			labels: metrics?.usersGraphData?.auditors?.labels,

@@ -1,6 +1,7 @@
 const axios = require('axios')
 const config = require('../config')
 const UserAccountRepository = require('../repository/userAccount.repository')
+const taskHistoryService = require('../service/taskHistory.service')
 
 const { CLIENT_ID, CLIENT_SECRET, URL } = config.BITRIX
 const redirectUrl = config.ETC.BASE_FRONT_URL
@@ -78,7 +79,7 @@ const convertStringToList = (str) => {
 	return str.split(',').map(Number)
 }
 
-const getTasksWithFilters = async (bitrixAccess, start, fromDate, toDate, groupsSelected) => {
+const getTasksWithFilters = async (bitrixAccess, start, fromDate, toDate, groupsSelected, userId) => {
 	const restUrl = baseAppBitrixRestUrlTask(bitrixAccess.fullDomain, bitrixAccess.accessToken)
 	const res = await axios
 		.get(
@@ -105,13 +106,16 @@ const getTasksWithFilters = async (bitrixAccess, start, fromDate, toDate, groups
 			}
 		})
 
-	// const tasks = res?.data?.result?.tasks || []
-	// for (const task of tasks) {
-	// 	const history = await getTaskHistory(bitrixAccess, task.id)
-	// 	task.history = history
-	// }
-
-	return res?.data || { total: null, result: { tasks: [] } }
+	const tasks = res?.data?.result?.tasks || []
+	try {
+		if (tasks.length > 0) {
+			taskHistoryService.insertHistory(tasks, userId)
+		}
+	} catch (e) {
+		console.error('Error inserting history:', e)
+	} finally {
+		return res?.data || { total: null, result: { tasks: [] } }
+	}
 }
 
 const getBitrixUsersByIds = async (bitrixAccess, formattedUserIdsParams) => {
@@ -141,5 +145,6 @@ module.exports = {
 	getFinalAccessUrl,
 	getTasksWithFilters,
 	getBitrixUsersByIds,
-	getBitrixGroups
+	getBitrixGroups,
+	getTaskHistory
 }
